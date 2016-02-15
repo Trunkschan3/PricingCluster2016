@@ -1,0 +1,114 @@
+---
+title: "Price Clusters 2016"
+author: "Jason Williams"
+date: "February 15, 2016"
+output: html_document
+---
+
+This is the analysis and clustering process to determing appropriate price increases of individual facilities
+
+```{r}
+##Load the the data
+library(xlsx)
+setwd("~/PCA/Pricing/2016 Pricing/Price_Surveys_2016")
+data_norm <- read.xlsx("PriceClusterInfo.xlsx", header = TRUE, sheetIndex = 1)
+data <- read.xlsx("PriceClusterInfo.xlsx", header = TRUE, sheetIndex = 2)
+data <- data[-c(121:122),]
+
+##Select only numerical data, remove ID column
+mydata <- data[, -1]; mydata_norm <- data_norm[,-1]
+
+##Check complete set for outliers
+boxplot(mydata); boxplot(mydata_norm)
+
+#Check for outliers in individual categories
+
+#Create function remove and replace outliers
+library(data.table)
+outlier_rep <- function(dataframe, cols, rows,  newvalue=NA){
+  if(any(rows)){
+    set(dataframe, rows, cols, newvalue)
+  }
+}
+
+##NPS Scores
+par(mfrow = c(1, 2))
+boxplot(mydata[,1]); boxplot(mydata_norm[,1])
+par(mfrow = c(1, 2))
+plot(mydata[,1]); plot(mydata_norm[,1]) #Plenty of outliers, so we can leave them in the data set. 
+
+##Director
+par(mfrow = c(1, 2))
+boxplot(mydata[,2]); boxplot(mydata_norm[,2])
+par(mfrow = c(1, 2))
+plot(mydata[,2]); plot(mydata_norm[,2]) 
+    #Only 2 outliers, replace with min value of data set
+
+    outlier_rep(data, "Director.Score", which(mydata$Director.Score < 6), 6.5)
+    outlier_rep(data_norm, "Director.Score", which(mydata_norm$Director.Score < -3), -3)
+
+##School Scores
+par(mfrow = c(1, 2))
+boxplot(mydata[,3]); boxplot(mydata_norm[,3])
+par(mfrow = c(1, 2))
+plot(mydata[,3]); plot(mydata_norm[,3]) 
+    #One outlier, remove it. 
+    outlier_rep(data, "Building.Score", which(mydata$Building.Score < 6), 6.5)
+    outlier_rep(data_norm, "Building.Score", which(mydata_norm$Building.Score < -3), -3)
+
+##Tenure
+par(mfrow = c(1, 2))
+boxplot(mydata[,4]); boxplot(mydata_norm[,4])
+par(mfrow = c(1, 2))
+plot(mydata[,4]); plot(mydata_norm[,4]) #Plenty of outliers, so we can leave them in the data set.
+    #two outliers, remove them. 
+    outlier_rep(data, "TenureChange", which(mydata$TenureChange > .6), .6)
+    outlier_rep(data_norm, "TenureChange", which(mydata_norm$TenureChange > 3), 3)
+
+
+##Occupancy
+par(mfrow = c(1, 2))
+boxplot(mydata[,5]); boxplot(mydata_norm[,5])
+par(mfrow = c(1, 2))
+plot(mydata[,5]); plot(mydata_norm[,5]) #No outliers
+
+##Promotor
+par(mfrow = c(1, 2))
+boxplot(mydata[,6]); boxplot(mydata_norm[,6])
+par(mfrow = c(1, 2))
+plot(mydata[,6]); plot(mydata_norm[,6]) 
+    #One outlier - replace it.
+    outlier_rep(data, "Promotor", which(mydata$Promotor < .2), .2)
+    outlier_rep(data_norm, "Promotor.", which(mydata_norm$Promotor. < -3), -3)
+
+##Detractor
+par(mfrow = c(1, 2))
+boxplot(mydata[,7]); boxplot(mydata_norm[,7])
+par(mfrow = c(1, 2))
+plot(mydata[,7]); plot(mydata_norm[,7]) #Plenty of outliers, so we can leave them in the data set.
+
+#calculate the variance and store it
+wss <- (nrow(mydata_norm)-1)*sum(apply(mydata_norm, 2, var))
+
+## iterate through wss array 15 times and sum up all the variance in every iteration and store it in wss array
+for(i in 2:15)wss[i] <- sum(fit = kmeans(mydata_norm,centers=i,15)$withinss)
+
+##Plot elbow graph to see clusters
+plot(1:15, wss, type = "b") # Graph shows us that the optimum number of clusters in 3 (elbow inflection point)
+
+fit <- kmeans(mydata_norm, 3)
+fit
+
+plot(mydata_norm,col=fit$cluster,pch=15) #Check for major intracluster patterns
+points(fit$centers,col=1:8,pch=3)
+
+library(cluster)
+library(fpc)
+plotcluster(mydata_norm,fit$cluster)
+points(fit$centers,col=1:8,pch=16)
+
+final <- data.frame(data_norm, fit$cluster)
+write.xlsx(final, file = "Cluster_Assign.xlsx")
+```
+
+
